@@ -663,3 +663,89 @@ respuesta = agente_rag.invoke(
 )
 
 print(respuesta)
+
+# Sistema multiagente completo
+
+class SistemaMultiAgente:
+
+    def __init__(
+
+        self,
+
+        normalizador,
+
+        entrenador,
+
+        comunicador
+
+    ):
+
+        self.normalizador = normalizador
+
+        self.entrenador = entrenador
+
+        self.comunicador = comunicador
+
+
+    def invoke(self, dataframe, pregunta):
+
+        datos_limpios = self.normalizador.invoke(
+
+            dataframe
+        )
+
+        resultados = self.entrenador.invoke(
+
+            datos_limpios
+        )
+
+        respuesta = self.comunicador.invoke(
+
+            pregunta
+        )
+
+        return {
+
+            "accuracy":resultados["accuracy"],
+
+            "respuesta":respuesta
+        }
+
+# Crear sistema completo
+
+sistema = SistemaMultiAgente(
+
+    agente_normalizador,
+
+    agente_entrenador,
+
+    agente_rag
+)
+
+print(
+
+    "Sistema multiagente listo"
+)
+
+# Ejecutar sistema completo
+
+resultado_final = sistema.invoke(
+
+    df,
+
+    "¿Qué características tienen los clientes que abandonan?"
+)
+
+# Mostrar resultados
+
+print(
+
+    f"Accuracy: {resultado_final['accuracy']:.4f}"
+)
+
+print()
+
+print(
+
+    resultado_final["respuesta"]
+)

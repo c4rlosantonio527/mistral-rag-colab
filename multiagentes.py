@@ -65,9 +65,11 @@ uploaded = files.upload()
 
 archivo = list(uploaded.keys())[0]
 
-df = pd.read_csv(
-    archivo
-)
+# Dataset para ML
+df = pd.read_csv(archivo)
+
+# Dataset independiente para RAG
+df_original = pd.read_csv(archivo)
 
 print(df.shape)
 
@@ -386,23 +388,27 @@ class AgenteComunicador:
         metricas = resultados["metricas"]
 
         prompt = f"""
-        Eres un analista especializado en abandono de clientes.
+        Eres un analista de Machine Learning especializado
+        en abandono de clientes.
 
-        Reglas:
+        Reglas estrictas:
 
-        - Usa lenguaje claro.
-        - No inventes información.
-        - Interpreta clase 0 como:
-          Cliente permanece.
-
-        - Interpreta clase 1 como:
-          Cliente abandona.
-
+        - No utilices emojis.
+        - No uses tablas.
+        - No inventes variables o información inexistente.
+        - No menciones características que no aparezcan
+          en las métricas entregadas.
+        - Mantén un tono profesional.
+        - Escribe máximo 4 párrafos.
         - Explica:
-          Accuracy
-          desempeño por clase
-          posibles debilidades
-          conclusiones
+
+        1. Accuracy general
+        2. Desempeño para clientes que permanecen
+        3. Desempeño para clientes que abandonan
+        4. Debilidad principal del modelo
+
+        Clase 0 = Cliente permanece
+        Clase 1 = Cliente abandona
 
         Accuracy:
 
@@ -442,3 +448,218 @@ reporte = agente_comunicador.invoke(
 # Mostrar reporte
 
 print(reporte)
+
+# Importaciones para RAG
+
+from langchain_core.documents import Document
+
+from langchain_huggingface import HuggingFaceEmbeddings
+
+from langchain_community.vectorstores import Chroma
+
+# Crear documentos desde dataset original
+
+documentos = []
+
+for _, fila in df_original.iterrows():
+
+    abandono = "Sí" if fila["Churn"]=="Yes" else "No"
+
+    texto = f"""
+
+    Cliente con {fila["tenure"]} meses de permanencia.
+
+    Género: {fila["gender"]}
+
+    Tiene pareja: {fila["Partner"]}
+
+    Tiene dependientes: {fila["Dependents"]}
+
+    Tipo de contrato: {fila["Contract"]}
+
+    Servicio de internet: {fila["InternetService"]}
+
+    Soporte técnico: {fila["TechSupport"]}
+
+    Facturación electrónica: {fila["PaperlessBilling"]}
+
+    Método de pago: {fila["PaymentMethod"]}
+
+    Cargo mensual: {fila["MonthlyCharges"]} dólares.
+
+    Cargo total: {fila["TotalCharges"]} dólares.
+
+    Estado abandono: {abandono}
+
+    """
+
+    documentos.append(
+
+        Document(
+            page_content=texto
+        )
+    )
+
+print(
+
+    f"Documentos creados: {len(documentos)}"
+)
+
+# Modelo de embeddings
+
+embeddings = HuggingFaceEmbeddings(
+
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+print("Embeddings configurados")
+
+# Crear base vectorial limpia
+
+vector_db = Chroma.from_documents(
+
+    documents=documentos,
+
+    embedding=embeddings,
+
+    collection_name="telco_rag_nuevo"
+)
+
+print("Base vectorial recreada")
+
+# Configurar retriever
+
+retriever = vector_db.as_retriever(
+
+    search_kwargs={
+
+        "k":15
+    }
+)
+
+print(
+
+    "Retriever configurado"
+)
+
+# Prueba recuperación semántica
+
+consulta = "clientes que abandonan"
+
+resultados = retriever.invoke(
+    consulta
+)
+
+for i, doc in enumerate(resultados):
+
+    print()
+
+    print("="*50)
+
+    print(f"Resultado {i+1}")
+
+    print(doc.page_content)
+
+# Agente comunicador con RAG
+
+class AgenteComunicadorRAG:
+
+    def __init__(self, client, retriever):
+
+        self.client = client
+        self.retriever = retriever
+
+
+    def invoke(self, pregunta):
+
+        documentos = self.retriever.invoke(
+            pregunta
+        )
+
+        contexto = "\n\n".join(
+
+            [
+
+                doc.page_content
+
+                for doc in documentos
+
+            ]
+        )
+
+        prompt = f"""
+        Eres un asistente especializado en análisis
+        de abandono de clientes.
+
+        Reglas:
+
+        - Responde únicamente usando el contexto.
+        - No inventes información.
+        - No uses emojis.
+        - Usa lenguaje profesional.
+        - Si no encuentras información suficiente,
+          indícalo.
+
+        Contexto:
+
+        {contexto}
+
+        Pregunta:
+
+        {pregunta}
+        """
+
+        respuesta = self.client.chat.complete(
+
+            model="mistral-small-latest",
+
+            messages=[
+
+                {
+
+                    "role":"user",
+
+                    "content":prompt
+                }
+
+            ]
+        )
+
+        return respuesta.choices[0].message.content
+
+# Inicializar agente
+
+agente_rag = AgenteComunicadorRAG(
+
+    client,
+    retriever
+)
+
+print("Agente RAG listo")
+
+# Primera consulta
+
+respuesta = agente_rag.invoke(
+
+    "¿Qué característica clave tienen los clientes que abandonan?"
+)
+
+print(respuesta)
+
+# Segunda consulta
+
+respuesta = agente_rag.invoke(
+
+    "¿Qué tipo de contrato tienen los clientes que permanecen?"
+)
+
+print(respuesta)
+
+# Tercera consulta
+
+respuesta = agente_rag.invoke(
+
+    "¿Qué métodos de pago aparecen con frecuencia?"
+)
+
+print(respuesta)

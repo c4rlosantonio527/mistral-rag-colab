@@ -150,3 +150,78 @@ print("Escalado finalizado")
 # Verificar dataset limpio
 
 df.head()
+
+# Separar variables predictoras y objetivo
+
+X = df.drop(
+    columns=["Churn"]
+)
+
+y = df["Churn"]
+
+print("Variables separadas")
+print(X.shape)
+
+# Dividir entrenamiento y prueba
+
+X_train, X_test, y_train, y_test = train_test_split(
+
+    X,
+    y,
+
+    test_size=0.2,
+
+    random_state=42,
+
+    stratify=y
+)
+
+print("División completada")
+
+# Entrenar modelo
+
+modelo = LogisticRegression(
+
+    max_iter=1000
+)
+
+modelo.fit(
+
+    X_train,
+    y_train
+)
+
+print("Modelo entrenado")
+
+# Generar predicciones
+
+predicciones = modelo.predict(
+
+    X_test
+)
+
+print("Predicciones generadas")
+
+# Accuracy
+
+accuracy = accuracy_score(
+
+    y_test,
+    predicciones
+)
+
+print(
+
+    f"Accuracy: {accuracy:.4f}"
+)
+
+# Reporte completo
+
+print(
+
+    classification_report(
+
+        y_test,
+        predicciones
+    )
+)

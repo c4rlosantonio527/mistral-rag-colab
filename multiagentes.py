@@ -225,3 +225,220 @@ print(
         predicciones
     )
 )
+
+# Agente normalizador
+
+class AgenteNormalizador:
+
+    def invoke(self, dataframe):
+
+        df = dataframe.copy()
+
+        if "customerID" in df.columns:
+
+            df = df.drop(
+                columns=["customerID"]
+            )
+
+        df["TotalCharges"] = pd.to_numeric(
+
+            df["TotalCharges"],
+            errors="coerce"
+        )
+
+        df["TotalCharges"] = df["TotalCharges"].fillna(
+
+            df["TotalCharges"].median()
+        )
+
+        encoder = LabelEncoder()
+
+        for columna in df.select_dtypes(include="object"):
+
+            df[columna] = encoder.fit_transform(
+
+                df[columna]
+            )
+
+        scaler = StandardScaler()
+
+        columnas_numericas = [
+
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges"
+        ]
+
+        df[columnas_numericas] = scaler.fit_transform(
+
+            df[columnas_numericas]
+        )
+
+        return df
+
+# Ejecutar agente
+
+agente_normalizador = AgenteNormalizador()
+
+df_limpio = agente_normalizador.invoke(
+    df
+)
+
+print(df_limpio.head())
+
+# Agente entrenador
+
+class AgenteEntrenador:
+
+    def invoke(self, dataframe):
+
+        X = dataframe.drop(
+            columns=["Churn"]
+        )
+
+        y = dataframe["Churn"]
+
+        X_train, X_test, y_train, y_test = train_test_split(
+
+            X,
+            y,
+
+            test_size=0.2,
+
+            random_state=42,
+
+            stratify=y
+        )
+
+        modelo = LogisticRegression(
+
+            max_iter=1000
+        )
+
+        modelo.fit(
+
+            X_train,
+            y_train
+        )
+
+        predicciones = modelo.predict(
+
+            X_test
+        )
+
+        accuracy = accuracy_score(
+
+            y_test,
+            predicciones
+        )
+
+        metricas = classification_report(
+
+            y_test,
+            predicciones,
+
+            output_dict=True
+        )
+
+        return {
+
+            "modelo":modelo,
+
+            "accuracy":accuracy,
+
+            "metricas":metricas
+        }
+
+# Ejecutar agente entrenador
+
+agente_entrenador = AgenteEntrenador()
+
+resultado = agente_entrenador.invoke(
+    df_limpio
+)
+
+# Visualizar resultados
+
+print(
+
+    f"Accuracy: {resultado['accuracy']:.4f}"
+)
+
+# Mostrar métricas principales
+
+print(
+
+    resultado["metricas"]["weighted avg"]
+)
+
+# Agente comunicador
+
+class AgenteComunicador:
+
+    def __init__(self, client):
+
+        self.client = client
+
+    def invoke(self, resultados):
+
+        accuracy = resultados["accuracy"]
+
+        metricas = resultados["metricas"]
+
+        prompt = f"""
+        Eres un analista especializado en abandono de clientes.
+
+        Reglas:
+
+        - Usa lenguaje claro.
+        - No inventes información.
+        - Interpreta clase 0 como:
+          Cliente permanece.
+
+        - Interpreta clase 1 como:
+          Cliente abandona.
+
+        - Explica:
+          Accuracy
+          desempeño por clase
+          posibles debilidades
+          conclusiones
+
+        Accuracy:
+
+        {accuracy}
+
+        Métricas:
+
+        {metricas}
+        """
+
+        respuesta = self.client.chat.complete(
+
+            model="mistral-small-latest",
+
+            messages=[
+
+                {
+                    "role":"user",
+                    "content":prompt
+                }
+
+            ]
+        )
+
+        return respuesta.choices[0].message.content
+
+# Ejecutar agente comunicador
+
+agente_comunicador = AgenteComunicador(
+    client
+)
+
+reporte = agente_comunicador.invoke(
+    resultado
+)
+
+# Mostrar reporte
+
+print(reporte)

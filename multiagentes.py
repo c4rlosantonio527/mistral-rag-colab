@@ -72,3 +72,81 @@ df = pd.read_csv(
 print(df.shape)
 
 df.head()
+
+# Explorar información general
+
+print("Dimensiones:")
+
+print(df.shape)
+
+print("\nTipos de datos:")
+
+print(df.dtypes)
+
+print("\nValores nulos:")
+
+print(df.isnull().sum())
+
+# Eliminar customerID porque no aporta al entrenamiento
+
+if "customerID" in df.columns:
+
+    df = df.drop(
+        columns=["customerID"]
+    )
+
+print("customerID eliminado")
+
+# Convertir TotalCharges a numérico
+
+df["TotalCharges"] = pd.to_numeric(
+
+    df["TotalCharges"],
+
+    errors="coerce"
+)
+
+print("Conversión realizada")
+
+# Imputar valores faltantes
+
+df["TotalCharges"] = df["TotalCharges"].fillna(
+
+    df["TotalCharges"].median()
+)
+
+print("Valores faltantes corregidos")
+
+# Codificar variables categóricas
+
+encoder = LabelEncoder()
+
+for columna in df.select_dtypes(include="object"):
+
+    df[columna] = encoder.fit_transform(
+        df[columna]
+    )
+
+print("Variables categóricas codificadas")
+
+# Escalar variables numéricas
+
+scaler = StandardScaler()
+
+columnas_numericas = [
+
+    "tenure",
+    "MonthlyCharges",
+    "TotalCharges"
+]
+
+df[columnas_numericas] = scaler.fit_transform(
+
+    df[columnas_numericas]
+)
+
+print("Escalado finalizado")
+
+# Verificar dataset limpio
+
+df.head()
